@@ -31,193 +31,149 @@ class BatchJobsTab:
     def setup_batch_jobs_tab(self, tab_view):
         """Setup the batch jobs tab"""
         batch_tab = tab_view.tab("Batch Jobs")
-
-        # Create frames
-        batch_tab.grid_columnconfigure(0, weight=1)
+        batch_tab.grid_columnconfigure(0, weight=5, uniform="batch")
+        batch_tab.grid_columnconfigure(1, weight=6, uniform="batch")
         batch_tab.grid_rowconfigure(0, weight=1)
 
-        # Create main frame with two panels
-        main_frame = ctk.CTkFrame(batch_tab, fg_color="transparent")
-        main_frame.grid(row=0, column=0, padx=6, pady=6, sticky="nsew")
-
-        main_frame.grid_columnconfigure(0, weight=1)
-        main_frame.grid_columnconfigure(1, weight=1)
-        main_frame.grid_rowconfigure(0, weight=1)
-
-        # Left panel - Batch list and management
-        left_panel = theme.card(main_frame)
-        left_panel.grid(row=0, column=0, padx=(0, 8), pady=0, sticky="nsew")
-
+        # ------------------------------------------------- left: batch list
+        left_panel = theme.card(batch_tab)
+        left_panel.grid(row=0, column=0, padx=(12, theme.GAP // 2), pady=12, sticky="nsew")
         left_panel.grid_columnconfigure(0, weight=1)
-        left_panel.grid_rowconfigure(1, weight=1)
+        left_panel.grid_rowconfigure(2, weight=1)
 
-        # Batch management buttons
-        batch_controls = ctk.CTkFrame(left_panel, fg_color="transparent")
-        batch_controls.grid(row=0, column=0, padx=6, pady=(6, 6), sticky="new")
+        list_header = ctk.CTkFrame(left_panel, fg_color="transparent")
+        list_header.grid(row=0, column=0, padx=theme.PAD, pady=(theme.PAD, 2), sticky="ew")
+        list_header.grid_columnconfigure(0, weight=1)
+        theme.section_label(list_header, "Your batches").grid(row=0, column=0, sticky="w")
 
-        batch_controls.grid_columnconfigure((0, 1, 2, 3), weight=1)
-
-        # Batch list header
-        theme.section_label(batch_controls, "Batch Jobs").grid(
-            row=0, column=0, columnspan=4, padx=10, pady=(10, 16), sticky="w"
-        )
-
-        # Batch controls
         self.new_batch_button = theme.secondary_button(
-            batch_controls,
-            text="New Batch",
-            command=self.new_batch
-        )
-        self.new_batch_button.grid(row=1, column=0, padx=4, pady=5, sticky="ew")
+            list_header, text="New batch", width=100, command=self.new_batch)
+        self.new_batch_button.grid(row=0, column=1, sticky="e")
 
-        self.run_batch_button = theme.primary_button(
-            batch_controls,
-            text="Run Selected",
-            command=self.run_selected_batch
-        )
-        self.run_batch_button.grid(row=1, column=1, padx=4, pady=5, sticky="ew")
+        theme.hint_label(left_panel, "Select a batch to edit or run it.").grid(
+            row=1, column=0, padx=theme.PAD, pady=(0, 8), sticky="w")
 
-        self.delete_batch_button = theme.danger_button(
-            batch_controls,
-            text="Delete",
-            command=self.delete_batch,
-        )
-        self.delete_batch_button.grid(row=1, column=2, padx=4, pady=5, sticky="ew")
-
-        self.cancel_batch_button = theme.secondary_button(
-            batch_controls,
-            text="Cancel Batch",
-            command=self.cancel_batch,
-            state="disabled",
-        )
-        self.cancel_batch_button.grid(row=1, column=3, padx=4, pady=5, sticky="ew")
-
-        # Batch list
         self.batch_list_frame = ctk.CTkScrollableFrame(left_panel, fg_color="transparent")
-        self.batch_list_frame.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="nsew")
+        self.batch_list_frame.grid(row=2, column=0, padx=(theme.PAD - 8, 8), pady=(0, 12), sticky="nsew")
         self.batch_list_frame.grid_columnconfigure(0, weight=1)
+        self.batch_rows = {}
 
-        # Right panel - Batch details and job management
-        right_panel = theme.card(main_frame)
-        right_panel.grid(row=0, column=1, padx=(8, 0), pady=0, sticky="nsew")
-
+        # ------------------------------------------- right: selected batch
+        right_panel = theme.card(batch_tab)
+        right_panel.grid(row=0, column=1, padx=(theme.GAP // 2, 12), pady=12, sticky="nsew")
         right_panel.grid_columnconfigure(0, weight=1)
-        right_panel.grid_rowconfigure(0, weight=0)
-        right_panel.grid_rowconfigure(1, weight=0)
-        right_panel.grid_rowconfigure(2, weight=0)
-        right_panel.grid_rowconfigure(3, weight=1)
+        right_panel.grid_rowconfigure(7, weight=1)
 
-        # Batch details section
-        batch_details_frame = ctk.CTkFrame(right_panel, fg_color=theme.SURFACE_ALT,
-                                            corner_radius=theme.RADIUS_SM)
-        batch_details_frame.grid(row=0, column=0, padx=12, pady=(12, 8), sticky="new")
+        self.batch_form_title = theme.section_label(right_panel, "New batch")
+        self.batch_form_title.grid(row=0, column=0, padx=theme.PAD, pady=(theme.PAD, 14), sticky="w")
 
-        batch_details_frame.grid_columnconfigure(1, weight=1)
+        # Name + description
+        details = ctk.CTkFrame(right_panel, fg_color="transparent")
+        details.grid(row=1, column=0, padx=theme.PAD, sticky="ew")
+        details.grid_columnconfigure((0, 1), weight=1)
 
-        # Batch name
-        ctk.CTkLabel(batch_details_frame, text="Batch Name", font=theme.FONT_BODY_BOLD,
-                     text_color=theme.TEXT_MUTED).grid(
-            row=0, column=0, padx=10, pady=10, sticky="w"
-        )
+        theme.field_label(details, "Name").grid(row=0, column=0, padx=(0, 6), pady=(0, 4), sticky="w")
+        theme.field_label(details, "Description (optional)").grid(
+            row=0, column=1, padx=(6, 0), pady=(0, 4), sticky="w")
 
         self.batch_name_var = ctk.StringVar()
-        batch_name_entry = ctk.CTkEntry(
-            batch_details_frame,
-            textvariable=self.batch_name_var,
-            width=250,
-            font=theme.FONT_BODY,
-            corner_radius=theme.RADIUS_SM,
-            fg_color=theme.SURFACE,
-            border_color=theme.BORDER,
-        )
-        batch_name_entry.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
-
-        # Batch description
-        ctk.CTkLabel(batch_details_frame, text="Description", font=theme.FONT_BODY_BOLD,
-                     text_color=theme.TEXT_MUTED).grid(
-            row=1, column=0, padx=10, pady=10, sticky="w"
-        )
+        batch_name_entry = theme.entry(details, textvariable=self.batch_name_var,
+                                       placeholder_text="e.g. End of day")
+        batch_name_entry.grid(row=1, column=0, padx=(0, 6), sticky="ew")
+        batch_name_entry.bind("<Return>", lambda _e: self.save_batch())
 
         self.batch_description_var = ctk.StringVar()
-        batch_description_entry = ctk.CTkEntry(
-            batch_details_frame,
-            textvariable=self.batch_description_var,
-            width=250,
-            font=theme.FONT_BODY,
-            corner_radius=theme.RADIUS_SM,
-            fg_color=theme.SURFACE,
-            border_color=theme.BORDER,
-        )
-        batch_description_entry.grid(row=1, column=1, padx=10, pady=10, sticky="ew")
+        theme.entry(details, textvariable=self.batch_description_var).grid(
+            row=1, column=1, padx=(6, 0), sticky="ew")
 
-        # Save batch button
-        self.save_batch_button = theme.primary_button(
-            batch_details_frame,
-            text="Save Batch",
-            command=self.save_batch
-        )
-        self.save_batch_button.grid(row=2, column=1, padx=10, pady=(0, 10), sticky="e")
+        # Save / delete
+        form_buttons = ctk.CTkFrame(right_panel, fg_color="transparent")
+        form_buttons.grid(row=2, column=0, padx=theme.PAD, pady=(12, 18), sticky="ew")
+        form_buttons.grid_columnconfigure(1, weight=1)
 
-        # Job management section
-        job_management_frame = ctk.CTkFrame(right_panel, fg_color=theme.SURFACE_ALT,
-                                             corner_radius=theme.RADIUS_SM)
-        job_management_frame.grid(row=1, column=0, padx=12, pady=(0, 8), sticky="new")
+        self.save_batch_button = theme.secondary_button(
+            form_buttons, text="Create batch", width=130, command=self.save_batch)
+        self.save_batch_button.grid(row=0, column=0, sticky="w")
 
+        self.delete_batch_button = theme.danger_button(
+            form_buttons, text="Delete batch", width=120, command=self.delete_batch)
+        self.delete_batch_button.grid(row=0, column=2, sticky="e")
+
+        ctk.CTkFrame(right_panel, fg_color=theme.LINE, height=1, corner_radius=0).grid(
+            row=3, column=0, padx=theme.PAD, sticky="ew")
+
+        # Jobs in the batch
+        jobs_header = ctk.CTkFrame(right_panel, fg_color="transparent")
+        jobs_header.grid(row=4, column=0, padx=theme.PAD, pady=(16, 2), sticky="ew")
+        jobs_header.grid_columnconfigure(0, weight=1)
+        theme.section_label(jobs_header, "Jobs in this batch", font=theme.FONT_H2).grid(
+            row=0, column=0, sticky="w")
+        theme.hint_label(right_panel, "They run top to bottom. Switch one off to skip it.").grid(
+            row=5, column=0, padx=theme.PAD, pady=(0, 10), sticky="w")
+
+        # Add a job
+        job_management_frame = ctk.CTkFrame(right_panel, fg_color="transparent")
+        job_management_frame.grid(row=6, column=0, padx=theme.PAD, pady=(0, 8), sticky="ew")
         job_management_frame.grid_columnconfigure(0, weight=1)
-        job_management_frame.grid_columnconfigure(1, weight=1)
-
-        # Available jobs
-        ctk.CTkLabel(job_management_frame, text="Available Jobs", font=theme.FONT_BODY_BOLD,
-                     text_color=theme.TEXT_MUTED).grid(
-            row=0, column=0, padx=10, pady=(10, 4), sticky="w"
-        )
 
         self.available_jobs_var = ctk.StringVar()
-        self.available_jobs = ctk.CTkOptionMenu(
-            job_management_frame,
-            variable=self.available_jobs_var,
-            values=["No jobs available"],
-            font=theme.FONT_BODY,
-            fg_color=theme.SURFACE,
-            button_color=theme.ACCENT,
-            button_hover_color=theme.ACCENT_HOVER,
-            dropdown_fg_color=theme.SURFACE,
-            corner_radius=theme.RADIUS_SM,
-        )
-        self.available_jobs.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="ew")
+        self.available_jobs = theme.option_menu(
+            job_management_frame, variable=self.available_jobs_var, values=["No jobs available"])
+        self.available_jobs.grid(row=0, column=0, padx=(0, 8), sticky="ew")
 
-        # Add job button
-        self.add_job_to_batch_button = theme.primary_button(
-            job_management_frame,
-            text="Add to Batch →",
-            command=self.add_job_to_batch
-        )
-        self.add_job_to_batch_button.grid(row=1, column=1, padx=10, pady=(0, 10))
-
-        # Batch jobs list section
-        theme.section_label(right_panel, "Jobs in this Batch", font=theme.FONT_H2).grid(
-            row=2, column=0, padx=12, pady=(4, 5), sticky="nw"
-        )
+        self.add_job_to_batch_button = theme.secondary_button(
+            job_management_frame, text="Add job", width=100, command=self.add_job_to_batch)
+        self.add_job_to_batch_button.grid(row=0, column=1)
 
         self.batch_jobs_frame = ctk.CTkScrollableFrame(right_panel, fg_color="transparent")
-        self.batch_jobs_frame.grid(row=3, column=0, padx=12, pady=(0, 12), sticky="nsew")
+        self.batch_jobs_frame.grid(row=7, column=0, padx=(theme.PAD - 8, 8), pady=(0, 8), sticky="nsew")
         self.batch_jobs_frame.grid_columnconfigure(0, weight=1)
+
+        # Run / cancel: the page's primary action, anchored at the bottom
+        run_bar = ctk.CTkFrame(right_panel, fg_color="transparent")
+        run_bar.grid(row=8, column=0, padx=theme.PAD, pady=(4, theme.PAD), sticky="ew")
+        run_bar.grid_columnconfigure(0, weight=1)
+
+        self.run_batch_button = theme.primary_button(
+            run_bar, text="Run this batch", command=self.run_selected_batch)
+        self.run_batch_button.grid(row=0, column=0, padx=(0, 8), sticky="ew")
+
+        self.cancel_batch_button = theme.danger_button(
+            run_bar, text="Stop batch", width=110, command=self.cancel_batch, state="disabled")
+        self.cancel_batch_button.grid(row=0, column=1)
+        theme.set_enabled(self.cancel_batch_button, False)
 
         # Initialize batch editing state
         self.load_batch_jobs()
         self.new_batch()
+
+    def _highlight_editing_row(self):
+        for batch_id, row in self.batch_rows.items():
+            selected = batch_id == self.current_editing_batch_id
+            theme.set_row_base(row, theme.RAISED_HOVER if selected else theme.RAISED)
+            row.configure(border_width=1 if selected else 0, border_color=theme.LINE_STRONG)
+
+    def _set_editing_state(self, editing, name=""):
+        """Keep the form title and buttons in step with what's being edited."""
+        self.batch_form_title.configure(text=f"Edit {name}" if editing else "New batch")
+        self.save_batch_button.configure(text="Save changes" if editing else "Create batch")
+        theme.set_enabled(self.delete_batch_button, editing)
+        if not self.parent.backup_tab._backup_active:
+            theme.set_enabled(self.run_batch_button, editing)
+        self._highlight_editing_row()
 
     def new_batch(self):
         """Clear the batch form for a new batch"""
         self.current_editing_batch_id = None
         self.batch_name_var.set("")
         self.batch_description_var.set("")
-        self.save_batch_button.configure(text="Create Batch")
-        self.delete_batch_button.configure(state="disabled", fg_color=theme.NEUTRAL, hover_color=theme.NEUTRAL_HOVER)
+        self._set_editing_state(False)
 
         # Clear the jobs in batch frame
         for widget in self.batch_jobs_frame.winfo_children():
             widget.destroy()
+        theme.hint_label(self.batch_jobs_frame, "Create the batch first, then add jobs to it.").grid(
+            row=0, column=0, padx=8, pady=10, sticky="w")
 
         # Update available jobs dropdown
         self.update_available_jobs_dropdown()
@@ -228,11 +184,7 @@ class BatchJobsTab:
         description = self.batch_description_var.get().strip()
 
         if not name:
-            CTkMessagebox(
-                title="Error",
-                message="Batch name is required",
-                icon="cancel"
-            )
+            self.parent.toast("Give the batch a name.", kind="error")
             return
 
         try:
@@ -245,11 +197,7 @@ class BatchJobsTab:
                 BatchJob.id != (self.current_editing_batch_id or -1),
             ).first()
             if clash:
-                CTkMessagebox(
-                    title="Error",
-                    message="An active batch with this name already exists",
-                    icon="cancel"
-                )
+                self.parent.toast(f"A batch named \"{name}\" already exists. Pick another name.", kind="error")
                 return
 
             if self.current_editing_batch_id is not None:
@@ -259,11 +207,7 @@ class BatchJobsTab:
                     batch.name = name
                     batch.description = description
                     self.db_session.commit()
-                    CTkMessagebox(
-                        title="Success",
-                        message="Batch updated successfully",
-                        icon="check"
-                    )
+                    self.parent.toast("Changes saved")
             else:
                 # Creating new batch
                 batch = BatchJob(
@@ -275,17 +219,12 @@ class BatchJobsTab:
                 self.db_session.add(batch)
                 self.db_session.commit()
                 self.current_editing_batch_id = batch.id
-                self.save_batch_button.configure(text="Update Batch")
-                self.delete_batch_button.configure(state="normal", fg_color=theme.DANGER, hover_color=theme.DANGER_HOVER)
-
-                CTkMessagebox(
-                    title="Success",
-                    message="Batch created successfully",
-                    icon="check"
-                )
+                self.parent.toast(f"Batch created: {name}. Now add jobs to it.")
 
             # Refresh the batch list
             self.load_batch_jobs()
+            self._set_editing_state(True, name)
+            self.load_jobs_in_batch(self.current_editing_batch_id)
 
         except Exception as e:
             logger.error(f"Error saving batch: {e}")
@@ -306,48 +245,38 @@ class BatchJobsTab:
             BatchJob = self.parent.BatchJob
             batches = self.db_session.query(BatchJob).filter_by(is_active=True).all()
 
-            # Add batches to the batch list
+            self.batch_rows = {}
             if not batches:
-                ctk.CTkLabel(
-                    self.batch_list_frame, text="No batches yet — create one above.",
-                    font=theme.FONT_BODY, text_color=theme.TEXT_MUTED,
-                ).grid(row=0, column=0, padx=10, pady=20, sticky="w")
+                theme.hint_label(
+                    self.batch_list_frame,
+                    "No batches yet. A batch runs several jobs in a row, like an end-of-day backup.",
+                    wraplength=300,
+                ).grid(row=0, column=0, padx=8, pady=20, sticky="w")
 
             for i, batch in enumerate(batches):
-                batch_frame = ctk.CTkFrame(self.batch_list_frame, fg_color=theme.SURFACE_ALT,
-                                            corner_radius=theme.RADIUS_SM)
-                batch_frame.grid(row=i, column=0, padx=6, pady=6, sticky="ew")
-                batch_frame.grid_columnconfigure(0, weight=1)
+                row = ctk.CTkFrame(self.batch_list_frame, fg_color=theme.RAISED,
+                                   corner_radius=theme.RADIUS_SM)
+                row.grid(row=i, column=0, padx=0, pady=4, sticky="ew")
+                row.grid_columnconfigure(0, weight=1)
 
-                # Batch Name
-                ctk.CTkLabel(batch_frame, text=batch.name, font=theme.FONT_H2).grid(
-                    row=0, column=0, padx=12, pady=(10, 4), sticky="w"
-                )
+                ctk.CTkLabel(row, text=batch.name, font=theme.FONT_H2, anchor="w").grid(
+                    row=0, column=0, padx=14, pady=(12, 0), sticky="w")
 
-                # Batch Description
-                description_text = batch.description if batch.description else "No description"
-                if len(description_text) > 40:
-                    description_text = description_text[:37] + "..."
-                ctk.CTkLabel(batch_frame, text=description_text, font=theme.FONT_SMALL,
-                             text_color=theme.TEXT_MUTED).grid(
-                    row=1, column=0, padx=12, pady=0, sticky="w"
-                )
+                if batch.description:
+                    description = batch.description
+                    if len(description) > 48:
+                        description = description[:47] + "…"
+                    theme.hint_label(row, description).grid(row=1, column=0, padx=14, sticky="w")
 
-                # Last Run
-                last_run = "Never" if not batch.last_run else batch.last_run.strftime("%Y-%m-%d %H:%M")
-                ctk.CTkLabel(batch_frame, text=f"Last Run: {last_run}", font=theme.FONT_SMALL,
-                             text_color=theme.TEXT_MUTED).grid(
-                    row=2, column=0, padx=12, pady=(0, 10), sticky="w"
-                )
+                last_run = ("Never run" if not batch.last_run
+                            else f"Last run {batch.last_run:%d %b %Y, %H:%M}")
+                theme.hint_label(row, last_run, text_color=theme.TEXT_FAINT).grid(
+                    row=2, column=0, padx=14, pady=(0, 12), sticky="w")
 
-                # Edit button
-                edit_button = theme.secondary_button(
-                    batch_frame,
-                    text="Edit",
-                    width=60,
-                    command=lambda b=batch: self.edit_batch(b)
-                )
-                edit_button.grid(row=0, column=1, rowspan=3, padx=12, pady=10)
+                theme.make_clickable(row, lambda b=batch: self.edit_batch(b))
+                self.batch_rows[batch.id] = row
+
+            self._highlight_editing_row()
 
         except Exception as e:
             logger.error(f"Error loading batch jobs: {e}")
@@ -358,8 +287,7 @@ class BatchJobsTab:
         self.current_editing_batch_id = batch.id
         self.batch_name_var.set(batch.name)
         self.batch_description_var.set(batch.description if batch.description else "")
-        self.save_batch_button.configure(text="Update Batch")
-        self.delete_batch_button.configure(state="normal", fg_color=theme.DANGER, hover_color=theme.DANGER_HOVER)
+        self._set_editing_state(True, batch.name)
 
         # Clear and reload the jobs in this batch
         self.load_jobs_in_batch(batch.id)
@@ -375,14 +303,14 @@ class BatchJobsTab:
         # Show confirmation dialog
         messagebox = CTkMessagebox(
             title="Confirm Deletion",
-            message="Are you sure you want to delete this batch?",
+            message=f"Delete \"{self.batch_name_var.get()}\"? The jobs in it are kept.",
             icon="question",
             option_1="Cancel",
-            option_2="Delete"
+            option_2="Delete batch"
         )
         response = messagebox.get()
 
-        if response == "Delete":
+        if response == "Delete batch":
             try:
                 BatchJob = self.parent.BatchJob
                 batch = self.db_session.get(BatchJob, self.current_editing_batch_id)
@@ -391,11 +319,7 @@ class BatchJobsTab:
                     batch.is_active = False
                     self.db_session.commit()
 
-                    CTkMessagebox(
-                        title="Success",
-                        message="Batch deleted successfully",
-                        icon="check"
-                    )
+                    self.parent.toast(f"Batch deleted: {batch.name}")
 
                     # Refresh batch list and clear form
                     self.load_batch_jobs()
@@ -432,11 +356,11 @@ class BatchJobsTab:
             if available_jobs:
                 self.available_jobs.configure(values=[job.name for job in available_jobs])
                 self.available_jobs_var.set(available_jobs[0].name)
-                self.add_job_to_batch_button.configure(state="normal")
+                theme.set_enabled(self.add_job_to_batch_button, True)
             else:
                 self.available_jobs.configure(values=["No jobs available"])
                 self.available_jobs_var.set("No jobs available")
-                self.add_job_to_batch_button.configure(state="disabled")
+                theme.set_enabled(self.add_job_to_batch_button, False)
 
         except Exception as e:
             logger.error(f"Error updating available jobs: {e}")
@@ -445,11 +369,7 @@ class BatchJobsTab:
     def add_job_to_batch(self):
         """Add the selected job to the current batch"""
         if self.current_editing_batch_id is None:
-            CTkMessagebox(
-                title="Error",
-                message="Please create or select a batch first",
-                icon="cancel"
-            )
+            self.parent.toast("Create the batch first, then add jobs to it.", kind="error")
             return
 
         job_name = self.available_jobs_var.get()
@@ -515,82 +435,58 @@ class BatchJobsTab:
             ).order_by(BatchItem.order).all()
 
             if not batch_items:
-                ctk.CTkLabel(self.batch_jobs_frame, text="No jobs in this batch",
-                             font=theme.FONT_BODY, text_color=theme.TEXT_MUTED).grid(
-                    row=0, column=0, padx=10, pady=10, sticky="w"
+                theme.hint_label(self.batch_jobs_frame,
+                                 "No jobs yet. Pick one above and select Add job.").grid(
+                    row=0, column=0, padx=8, pady=10, sticky="w"
                 )
                 return
 
-            # Add jobs to the list
+            # Add jobs to the list. The number is real: it's the run order.
             for i, item in enumerate(batch_items):
                 job = self.db_session.get(BackupJob, item.job_id)
-                if job:
-                    job_frame = ctk.CTkFrame(self.batch_jobs_frame, fg_color=theme.SURFACE_ALT,
-                                              corner_radius=theme.RADIUS_SM)
-                    job_frame.grid(row=i, column=0, padx=6, pady=6, sticky="ew")
-                    job_frame.grid_columnconfigure(1, weight=1)
+                if not job:
+                    continue
+                job_frame = ctk.CTkFrame(self.batch_jobs_frame, fg_color=theme.RAISED,
+                                         corner_radius=theme.RADIUS_SM)
+                job_frame.grid(row=i, column=0, padx=0, pady=4, sticky="ew")
+                job_frame.grid_columnconfigure(1, weight=1)
 
-                    # Job order indicator
-                    order_label = ctk.CTkLabel(job_frame, text=f"{i + 1}.", font=theme.FONT_H2,
-                                                text_color=theme.TEXT_MUTED)
-                    order_label.grid(row=0, column=0, rowspan=2, padx=(10, 5), pady=10)
+                name_color = theme.INK if item.is_enabled else theme.TEXT_FAINT
+                ctk.CTkLabel(job_frame, text=f"{i + 1}", font=theme.FONT_H2, width=22,
+                             text_color=theme.TEXT_FAINT).grid(
+                    row=0, column=0, rowspan=2, padx=(12, 6), pady=10)
 
-                    # Job Name
-                    ctk.CTkLabel(job_frame, text=job.name, font=theme.FONT_BODY_BOLD).grid(
-                        row=0, column=1, padx=5, pady=(10, 0), sticky="w"
-                    )
+                ctk.CTkLabel(job_frame, text=job.name, font=theme.FONT_BODY_BOLD,
+                             text_color=name_color, anchor="w").grid(
+                    row=0, column=1, padx=4, pady=(10, 0), sticky="w")
+                theme.hint_label(
+                    job_frame,
+                    theme.shorten_path(job.source_path, 36) if item.is_enabled else "Skipped when the batch runs",
+                    font=theme.FONT_MONO if item.is_enabled else theme.FONT_SMALL,
+                    text_color=theme.TEXT_MUTED if item.is_enabled else theme.TEXT_FAINT,
+                ).grid(row=1, column=1, padx=4, pady=(0, 10), sticky="w")
 
-                    # Source Path
-                    source_text = f"Source: {job.source_path}"
-                    if len(source_text) > 40:
-                        source_text = source_text[:37] + "..."
-                    ctk.CTkLabel(job_frame, text=source_text, font=theme.FONT_SMALL,
-                                 text_color=theme.TEXT_MUTED).grid(
-                        row=1, column=1, padx=5, pady=(0, 10), sticky="w"
-                    )
+                is_enabled_var = ctk.BooleanVar(value=item.is_enabled)
+                ctk.CTkSwitch(
+                    job_frame, text="", width=44, variable=is_enabled_var,
+                    command=lambda v=is_enabled_var, item_id=item.id: self.toggle_job_enabled(item_id, v),
+                ).grid(row=0, column=2, rowspan=2, padx=(6, 0), pady=10)
 
-                    # Enable/Disable toggle
-                    is_enabled_var = ctk.BooleanVar(value=item.is_enabled)
-                    toggle_switch = ctk.CTkSwitch(
-                        job_frame,
-                        text="",
-                        variable=is_enabled_var,
-                        command=lambda v=is_enabled_var, item_id=item.id: self.toggle_job_enabled(item_id, v),
-                        progress_color=theme.SUCCESS if item.is_enabled else theme.DANGER,
-                        button_color=theme.SUCCESS_HOVER if item.is_enabled else theme.DANGER_HOVER,
-                    )
-                    toggle_switch.grid(row=0, column=2, rowspan=2, padx=10, pady=10)
-
-                    # Remove button
-                    remove_button = theme.danger_button(
-                        job_frame,
-                        text="×",
-                        width=30,
-                        command=lambda item_id=item.id: self.remove_job_from_batch(item_id),
-                    )
-                    remove_button.grid(row=0, column=3, rowspan=2, padx=5, pady=10)
-
-                    # Move up/down buttons
-                    move_frame = ctk.CTkFrame(job_frame, fg_color="transparent")
-                    move_frame.grid(row=0, column=4, rowspan=2, padx=5, pady=10)
-
-                    up_button = theme.secondary_button(
-                        move_frame,
-                        text="▲",
-                        width=30,
-                        command=lambda item_id=item.id: self.move_job_up(item_id),
-                        state="disabled" if i == 0 else "normal"
-                    )
-                    up_button.grid(row=0, column=0, padx=2, pady=2)
-
-                    down_button = theme.secondary_button(
-                        move_frame,
-                        text="▼",
-                        width=30,
-                        command=lambda item_id=item.id: self.move_job_down(item_id),
-                        state="disabled" if i == len(batch_items) - 1 else "normal"
-                    )
-                    down_button.grid(row=1, column=0, padx=2, pady=2)
+                small = dict(width=30, height=28, font=theme.FONT_SMALL_BOLD)
+                theme.secondary_button(
+                    job_frame, text="▲", **small,
+                    command=lambda item_id=item.id: self.move_job_up(item_id),
+                    state="disabled" if i == 0 else "normal",
+                ).grid(row=0, column=3, rowspan=2, padx=(6, 2))
+                theme.secondary_button(
+                    job_frame, text="▼", **small,
+                    command=lambda item_id=item.id: self.move_job_down(item_id),
+                    state="disabled" if i == len(batch_items) - 1 else "normal",
+                ).grid(row=0, column=4, rowspan=2, padx=2)
+                theme.danger_button(
+                    job_frame, text="✕", **small,
+                    command=lambda item_id=item.id: self.remove_job_from_batch(item_id),
+                ).grid(row=0, column=5, rowspan=2, padx=(2, 12))
 
         except Exception as e:
             logger.error(f"Error loading jobs in batch: {e}")
@@ -718,7 +614,7 @@ class BatchJobsTab:
         # Show confirmation dialog
         messagebox = CTkMessagebox(
             title="Confirm Batch Run",
-            message="Are you sure you want to run this batch?",
+            message=f"Run \"{self.batch_name_var.get()}\" now? Its jobs run one after another.",
             icon="question",
             option_1="Cancel",
             option_2="Run"
@@ -803,18 +699,16 @@ class BatchJobsTab:
         run (e.g. Run All) that isn't tied to a saved batch.
         """
         # Switch to Backup tab to show progress
-        self.parent.tab_view.set("Backup")
+        self.parent.show_page("Backup")
 
         # Clear the log
-        self.parent.backup_tab.log_text.configure(state="normal")
-        self.parent.backup_tab.log_text.delete("1.0", "end")
-        self.parent.backup_tab.log_text.configure(state="disabled")
+        self.parent.backup_tab.clear_log()
 
         self.parent.log_message(start_message)
 
         self._batch_cancelled.clear()
-        self.run_batch_button.configure(state="disabled")
-        self.cancel_batch_button.configure(state="normal", fg_color=theme.DANGER, hover_color=theme.DANGER_HOVER)
+        theme.set_enabled(self.run_batch_button, False)
+        theme.set_enabled(self.cancel_batch_button, True)
         # Held for the whole run — Start/Scan on the Backup tab must
         # stay disabled between jobs, not just during each individual job.
         self.parent.backup_tab._backup_active = True
@@ -860,7 +754,7 @@ class BatchJobsTab:
                 def update_progress(index=i, total=total_jobs):
                     backup_tab = self.parent.backup_tab
                     backup_tab.progress_bar.set(index / total)
-                    backup_tab.progress_label.configure(text=f"Job {index + 1} / {total}")
+                    backup_tab.progress_label.configure(text=f"Job {index + 1} of {total}")
 
                 self.parent.post_to_ui(update_progress)
 
@@ -904,10 +798,12 @@ class BatchJobsTab:
             def update_ui():
                 backup_tab = self.parent.backup_tab
                 backup_tab.progress_bar.set(1.0)
-                backup_tab.progress_label.configure(text=f"Run completed: {successful_jobs}/{total_jobs} jobs successful")
+                backup_tab.progress_label.configure(text=f"Finished: {successful_jobs} of {total_jobs} jobs succeeded")
                 backup_tab._backup_active = False
-                self.run_batch_button.configure(state="normal")
-                self.cancel_batch_button.configure(state="disabled", fg_color=theme.NEUTRAL, hover_color=theme.NEUTRAL_HOVER)
+                theme.set_enabled(self.run_batch_button, self.current_editing_batch_id is not None)
+                theme.set_enabled(self.cancel_batch_button, False)
+                self.parent.toast(f"Run finished: {successful_jobs} of {total_jobs} jobs succeeded",
+                                  kind="success" if failed_jobs == 0 else "error")
                 # Refresh batch list
                 self.load_batch_jobs()
 
@@ -919,8 +815,8 @@ class BatchJobsTab:
 
             def reset_buttons():
                 self.parent.backup_tab._backup_active = False
-                self.run_batch_button.configure(state="normal")
-                self.cancel_batch_button.configure(state="disabled", fg_color=theme.NEUTRAL, hover_color=theme.NEUTRAL_HOVER)
+                theme.set_enabled(self.run_batch_button, self.current_editing_batch_id is not None)
+                theme.set_enabled(self.cancel_batch_button, False)
 
             self.parent.post_to_ui(reset_buttons)
         finally:
@@ -936,6 +832,6 @@ class BatchJobsTab:
             backup_tab = self.parent.backup_tab
             progress = (job_index + 1) / total_jobs
             backup_tab.progress_bar.set(progress)
-            backup_tab.progress_label.configure(text=f"Job {job_index + 1} / {total_jobs} completed")
+            backup_tab.progress_label.configure(text=f"Job {job_index + 1} of {total_jobs} finished")
 
         self.parent.post_to_ui(update_progress)

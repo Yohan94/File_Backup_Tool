@@ -10,6 +10,8 @@ from ui import theme
 # Configure logging
 logger = logging.getLogger(__name__)
 
+NO_JOBS = "No jobs available"
+
 
 class BackupTab:
     """UI for the Backup tab"""
@@ -18,7 +20,6 @@ class BackupTab:
         self.parent = parent
         self.db_session = db_session
         self.backup_engine = backup_engine
-        self.job_details_labels = []
         self.job_ids_by_name = {}
         self._backup_active = False
 
@@ -33,145 +34,154 @@ class BackupTab:
 
     def setup_backup_tab(self, tab_view):
         backup_tab = tab_view.tab("Backup")
+        backup_tab.grid_columnconfigure(0, weight=5, uniform="backup")
+        backup_tab.grid_columnconfigure(1, weight=6, uniform="backup")
 
-        # Create frames
-        self.backup_left_frame = theme.card(backup_tab)
-        self.backup_left_frame.grid(row=0, column=0, padx=(0, 8), pady=8, sticky="nsew")
+        # ---------------------------------------------------- left: the job
+        left = theme.card(backup_tab)
+        left.grid(row=0, column=0, padx=(12, theme.GAP // 2), pady=12, sticky="nsew")
+        left.grid_columnconfigure(0, weight=1)
+        left.grid_rowconfigure(4, weight=1)
+        self.backup_left_frame = left
 
-        backup_tab.grid_columnconfigure(0, weight=3)
-        backup_tab.grid_columnconfigure(1, weight=2)
-
-        self.backup_right_frame = theme.card(backup_tab)
-        self.backup_right_frame.grid(row=0, column=1, padx=(8, 0), pady=8, sticky="nsew")
-
-        # Configure left frame (job selection and controls)
-        self.backup_left_frame.grid_columnconfigure(0, weight=1)
-        self.backup_left_frame.grid_rowconfigure(3, weight=1)
-
-        # Job selection
-        theme.section_label(self.backup_left_frame, "Select Backup Job").grid(
-            row=0, column=0, padx=16, pady=(16, 6), sticky="w"
-        )
+        theme.section_label(left, "Job").grid(
+            row=0, column=0, padx=theme.PAD, pady=(theme.PAD, 10), sticky="w")
 
         self.job_selection_var = ctk.StringVar()
-        self.job_selection = ctk.CTkOptionMenu(
-            self.backup_left_frame,
-            variable=self.job_selection_var,
-            values=["No jobs available"],
-            width=280,
-            font=theme.FONT_BODY,
-            fg_color=theme.SURFACE_ALT,
-            button_color=theme.ACCENT,
-            button_hover_color=theme.ACCENT_HOVER,
-            dropdown_fg_color=theme.SURFACE_ALT,
-            corner_radius=theme.RADIUS_SM,
-            command=self.on_job_selected
+        self.job_selection = theme.option_menu(
+            left, variable=self.job_selection_var, values=[NO_JOBS],
+            command=self.on_job_selected,
         )
-        self.job_selection.grid(row=1, column=0, padx=16, pady=(0, 12), sticky="w")
+        self.job_selection.grid(row=1, column=0, padx=theme.PAD, pady=(0, 14), sticky="ew")
 
-        # Buttons frame
-        button_frame = ctk.CTkFrame(self.backup_left_frame, fg_color="transparent")
-        button_frame.grid(row=2, column=0, padx=12, pady=(0, 12), sticky="ew")
-
-        button_frame.grid_columnconfigure((0, 1, 2), weight=1)
-
-        self.scan_button = theme.secondary_button(
-            button_frame,
-            text="Scan",
-            command=self.scan_job
-        )
-        self.scan_button.grid(row=0, column=0, padx=4, pady=4, sticky="ew")
+        # Actions sit right under the selector: pick a job, then act on it.
+        button_frame = ctk.CTkFrame(left, fg_color="transparent")
+        button_frame.grid(row=2, column=0, padx=theme.PAD, pady=(0, 18), sticky="ew")
+        button_frame.grid_columnconfigure(2, weight=1)
 
         self.backup_button = theme.primary_button(
-            button_frame,
-            text="Start Backup",
-            command=self.start_backup
-        )
-        self.backup_button.grid(row=0, column=1, padx=4, pady=4, sticky="ew")
+            button_frame, text="Start backup", width=130, command=self.start_backup)
+        self.backup_button.grid(row=0, column=0, padx=(0, 8))
 
-        self.cancel_button = theme.secondary_button(
-            button_frame,
-            text="Cancel",
-            command=self.cancel_backup,
-            state="disabled"
-        )
-        self.cancel_button.grid(row=0, column=2, padx=4, pady=4, sticky="ew")
+        self.scan_button = theme.secondary_button(
+            button_frame, text="Check for changes", width=160, command=self.scan_job)
+        self.scan_button.grid(row=0, column=1)
 
-        # Job details
-        job_details_frame = ctk.CTkScrollableFrame(
-            self.backup_left_frame, label_text="Job Details",
-            label_font=theme.FONT_H2, fg_color=theme.SURFACE_ALT,
-            corner_radius=theme.RADIUS_SM,
-        )
-        job_details_frame.grid(row=3, column=0, padx=16, pady=(0, 16), sticky="nsew")
-        job_details_frame.grid_columnconfigure(1, weight=1)
+        self.cancel_button = theme.danger_button(
+            button_frame, text="Cancel", width=90, command=self.cancel_backup, state="disabled")
+        self.cancel_button.grid(row=0, column=2, sticky="e")
+        theme.set_enabled(self.cancel_button, False)
 
-        self.job_details_labels = []
-        for i, label_text in enumerate([
-            "Name:", "Source:", "Destination:", "Last Backup:", "Status:"
+        ctk.CTkFrame(left, fg_color=theme.LINE, height=1, corner_radius=0).grid(
+            row=3, column=0, padx=theme.PAD, sticky="ew")
+
+        # Details: a quiet definition list
+        details = ctk.CTkFrame(left, fg_color="transparent")
+        details.grid(row=4, column=0, padx=theme.PAD, pady=(16, theme.PAD), sticky="nsew")
+        details.grid_columnconfigure(1, weight=1)
+        self.details_frame = details
+
+        self.job_details = {}
+        for i, (key, label_text) in enumerate([
+            ("status", "Status"), ("source", "Copies from"),
+            ("destination", "Copies to"), ("last_backup", "Last backup"),
         ]):
-            label = ctk.CTkLabel(job_details_frame, text=label_text, font=theme.FONT_BODY_BOLD,
-                                  text_color=theme.TEXT_MUTED)
-            label.grid(row=i, column=0, padx=(6, 10), pady=4, sticky="w")
-
-            if label_text == "Status:":
-                value_label = theme.badge(job_details_frame, "-", kind="neutral")
+            theme.field_label(details, label_text).grid(
+                row=i, column=0, padx=(0, 18), pady=7, sticky="nw")
+            if key == "status":
+                value = theme.badge(details, "-", kind="neutral")
+            elif key in ("source", "destination"):
+                value = ctk.CTkLabel(details, text="-", font=theme.FONT_MONO, anchor="w",
+                                     justify="left", wraplength=320)
             else:
-                value_label = ctk.CTkLabel(job_details_frame, text="-", font=theme.FONT_BODY, anchor="w")
-            value_label.grid(row=i, column=1, padx=6, pady=4, sticky="w")
-            self.job_details_labels.append(value_label)
+                value = ctk.CTkLabel(details, text="-", font=theme.FONT_BODY, anchor="w")
+            value.grid(row=i, column=1, pady=7, sticky="w")
+            self.job_details[key] = value
 
-        # Configure right frame (backup progress and log)
-        self.backup_right_frame.grid_columnconfigure(0, weight=1)
-        self.backup_right_frame.grid_rowconfigure(4, weight=1)
+        # Empty state: shown instead of the details when there are no jobs
+        self.empty_state = ctk.CTkFrame(left, fg_color="transparent")
+        theme.section_label(self.empty_state, "No jobs yet", font=theme.FONT_H2).grid(
+            row=0, column=0, sticky="w")
+        theme.hint_label(
+            self.empty_state,
+            "A job pairs a folder to protect with a place to copy it.\n"
+            "Create one, then come back here to run it.",
+        ).grid(row=1, column=0, pady=(2, 12), sticky="w")
+        theme.primary_button(
+            self.empty_state, text="Create a job",
+            command=lambda: self.parent.show_page("Jobs"),
+        ).grid(row=2, column=0, sticky="w")
 
-        # Progress section
-        theme.section_label(self.backup_right_frame, "Backup Progress").grid(
-            row=0, column=0, padx=16, pady=(16, 8), sticky="w"
-        )
+        # --------------------------------------------------- right: progress
+        right = theme.card(backup_tab)
+        right.grid(row=0, column=1, padx=(theme.GAP // 2, 12), pady=12, sticky="nsew")
+        right.grid_columnconfigure(0, weight=1)
+        right.grid_rowconfigure(5, weight=1)
+        self.backup_right_frame = right
 
-        # Progress bar
+        theme.section_label(right, "Progress").grid(
+            row=0, column=0, padx=theme.PAD, pady=(theme.PAD, 12), sticky="w")
+
         self.progress_var = ctk.DoubleVar(value=0)
-        self.progress_bar = ctk.CTkProgressBar(
-            self.backup_right_frame, height=14, corner_radius=7,
-            progress_color=theme.ACCENT, fg_color=theme.SURFACE_ALT,
-        )
-        self.progress_bar.grid(row=1, column=0, padx=16, pady=(0, 8), sticky="ew")
+        self.progress_bar = theme.ProgressBar(right, height=8, corner_radius=4)
+        self.progress_bar.grid(row=1, column=0, padx=theme.PAD, pady=(0, 10), sticky="ew")
         self.progress_bar.set(0)
 
-        # Progress details
         self.progress_label = ctk.CTkLabel(
-            self.backup_right_frame, text="0 / 0 files processed (0%)", font=theme.FONT_BODY_BOLD
-        )
-        self.progress_label.grid(row=2, column=0, padx=16, pady=0, sticky="w")
+            right, text="Not started", font=theme.FONT_BODY_BOLD, anchor="w")
+        self.progress_label.grid(row=2, column=0, padx=theme.PAD, sticky="w")
 
-        self.time_label = ctk.CTkLabel(
-            self.backup_right_frame, text="Time elapsed: 00:00:00",
-            font=theme.FONT_SMALL, text_color=theme.TEXT_MUTED,
-        )
-        self.time_label.grid(row=3, column=0, padx=16, pady=(2, 12), sticky="w")
+        self.time_label = theme.hint_label(right, "Elapsed 00:00:00")
+        self.time_label.grid(row=3, column=0, padx=theme.PAD, pady=(0, 16), sticky="w")
 
-        # Log section
-        log_frame = ctk.CTkFrame(self.backup_right_frame, fg_color=theme.SURFACE_ALT,
-                                  corner_radius=theme.RADIUS_SM)
-        log_frame.grid(row=4, column=0, padx=16, pady=(0, 16), sticky="nsew")
-        log_frame.grid_columnconfigure(0, weight=1)
-        log_frame.grid_rowconfigure(1, weight=1)
-
-        theme.section_label(log_frame, "Backup Log", font=theme.FONT_H2).grid(
-            row=0, column=0, padx=12, pady=(10, 4), sticky="w"
-        )
+        log_header = ctk.CTkFrame(right, fg_color="transparent")
+        log_header.grid(row=4, column=0, padx=theme.PAD, pady=(0, 6), sticky="ew")
+        log_header.grid_columnconfigure(0, weight=1)
+        theme.section_label(log_header, "Activity", font=theme.FONT_H2).grid(
+            row=0, column=0, sticky="w")
+        theme.secondary_button(
+            log_header, text="Clear", width=64, height=28, font=theme.FONT_SMALL_BOLD,
+            command=self.clear_log,
+        ).grid(row=0, column=1, sticky="e")
 
         self.log_text = ctk.CTkTextbox(
-            log_frame, height=200, font=theme.FONT_MONO,
-            fg_color=theme.SURFACE, corner_radius=theme.RADIUS_SM,
+            right, font=theme.FONT_MONO, fg_color=theme.CANVAS, border_width=1,
+            border_color=theme.LINE, corner_radius=theme.RADIUS_SM, wrap="word",
+            text_color=theme.TEXT_MUTED,
         )
-        self.log_text.grid(row=1, column=0, padx=12, pady=(0, 12), sticky="nsew")
+        self.log_text.grid(row=5, column=0, padx=theme.PAD, pady=(0, theme.PAD), sticky="nsew")
         self.log_text.configure(state="disabled")
 
         # Link log_text to parent's log_text
         self.parent.log_text = self.log_text
         logger.info(f"log_text set to: {self.log_text}")
+
+    def clear_log(self):
+        self.log_text.configure(state="normal")
+        self.log_text.delete("1.0", "end")
+        self.log_text.configure(state="disabled")
+
+    def set_jobs(self, jobs):
+        """Refresh the job selector, keeping the current selection if it still exists."""
+        self.job_ids_by_name = {job.name: job.id for job in jobs}
+        if not jobs:
+            self.job_selection.configure(values=[NO_JOBS])
+            self.job_selection_var.set(NO_JOBS)
+            self.update_job_details(None)
+            return
+        names = [job.name for job in jobs]
+        self.job_selection.configure(values=names)
+        current = self.job_selection_var.get()
+        selected = current if current in self.job_ids_by_name else names[0]
+        self.job_selection_var.set(selected)
+        self.on_job_selected(selected)
+
+    def select_job(self, job_name):
+        """Select a job by name and bring the Backup page forward."""
+        if job_name in self.job_ids_by_name:
+            self.job_selection_var.set(job_name)
+            self.on_job_selected(job_name)
+        self.parent.show_page("Backup")
 
     def _get_selected_job(self, job_name):
         """Resolve the dropdown selection to a job by id, not by (reusable) name."""
@@ -182,7 +192,7 @@ class BackupTab:
 
     def on_job_selected(self, job_name):
         """Handle job selection from dropdown"""
-        if job_name == "No jobs available":
+        if job_name == NO_JOBS:
             self.update_job_details(None)
             return
 
@@ -196,31 +206,40 @@ class BackupTab:
 
     def update_job_details(self, job):
         """Update job details display"""
+        has_jobs = bool(self.job_ids_by_name)
+        if has_jobs:
+            self.empty_state.grid_forget()
+            self.details_frame.grid()
+        else:
+            self.details_frame.grid_remove()
+            self.empty_state.grid(row=4, column=0, padx=theme.PAD, pady=(16, theme.PAD), sticky="nw")
+        if not self._backup_active:
+            theme.set_enabled(self.backup_button, has_jobs)
+            theme.set_enabled(self.scan_button, has_jobs)
+
         if not job:
-            for label in self.job_details_labels[:4]:
-                label.configure(text="-")
-            theme.set_badge(self.job_details_labels[4], "-", kind="neutral")
+            for key in ("source", "destination", "last_backup"):
+                self.job_details[key].configure(text="-")
+            theme.set_badge(self.job_details["status"], "-", kind="neutral")
             return
 
-        # Update labels with job details
-        self.job_details_labels[0].configure(text=job.name)
-        self.job_details_labels[1].configure(text=job.source_path)
-        self.job_details_labels[2].configure(text=job.destination_path)
+        self.job_details["source"].configure(text=job.source_path)
+        self.job_details["destination"].configure(text=job.destination_path)
 
-        last_backup = "Never" if not job.last_backup else job.last_backup.strftime("%Y-%m-%d %H:%M")
-        self.job_details_labels[3].configure(text=last_backup)
+        last_backup = "Never" if not job.last_backup else job.last_backup.strftime("%d %b %Y, %H:%M")
+        self.job_details["last_backup"].configure(text=last_backup)
 
         if self.backup_engine.running:
-            theme.set_badge(self.job_details_labels[4], "Running Backup", kind="info")
+            theme.set_badge(self.job_details["status"], "Running", kind="info")
         elif self.backup_engine.paused:
-            theme.set_badge(self.job_details_labels[4], "Paused", kind="warning")
+            theme.set_badge(self.job_details["status"], "Paused", kind="warning")
         else:
-            theme.set_badge(self.job_details_labels[4], "Ready", kind="success")
+            theme.set_badge(self.job_details["status"], "Ready", kind="success")
 
     def scan_job(self):
         """Scan the selected job for changes"""
         job_name = self.job_selection_var.get()
-        if job_name == "No jobs available":
+        if job_name == NO_JOBS:
             self.log_message("No job selected")
             return
 
@@ -313,7 +332,7 @@ class BackupTab:
     def start_backup(self):
         """Start the backup process for the selected job"""
         job_name = self.job_selection_var.get()
-        if job_name == "No jobs available":
+        if job_name == NO_JOBS:
             self.log_message("No job selected")
             return
 
@@ -335,22 +354,20 @@ class BackupTab:
                 return
 
             # Clear the log
-            self.log_text.configure(state="normal")
-            self.log_text.delete("1.0", "end")
-            self.log_text.configure(state="disabled")
+            self.clear_log()
 
             self.log_message(f"Starting backup job: {job.name}")
 
             # Reset progress
             self.progress_bar.set(0)
-            self.progress_label.configure(text="0 / 0 files processed (0%)")
-            self.time_label.configure(text="Time elapsed: 00:00:00")
+            self.progress_label.configure(text="Looking for changed files")
+            self.time_label.configure(text="Elapsed 00:00:00")
 
             # Update UI controls
             self._backup_active = True
-            self.backup_button.configure(state="disabled")
-            self.scan_button.configure(state="disabled")
-            self.cancel_button.configure(state="normal", fg_color=theme.DANGER, hover_color=theme.DANGER_HOVER)
+            theme.set_enabled(self.backup_button, False)
+            theme.set_enabled(self.scan_button, False)
+            theme.set_enabled(self.cancel_button, True)
 
             # Start the backup process
             success = self.backup_engine.run_backup_job(
@@ -361,17 +378,17 @@ class BackupTab:
             if not success:
                 self.log_message("Failed to start backup")
                 self._backup_active = False
-                self.backup_button.configure(state="normal")
-                self.scan_button.configure(state="normal")
-                self.cancel_button.configure(state="disabled", fg_color=theme.NEUTRAL, hover_color=theme.NEUTRAL_HOVER)
+                theme.set_enabled(self.backup_button, True)
+                theme.set_enabled(self.scan_button, True)
+                theme.set_enabled(self.cancel_button, False)
 
         except Exception as e:
             logger.error(f"Error starting backup: {e}")
             self.log_message(f"Error starting backup: {e}")
             self._backup_active = False
-            self.backup_button.configure(state="normal")
-            self.scan_button.configure(state="normal")
-            self.cancel_button.configure(state="disabled", fg_color=theme.NEUTRAL, hover_color=theme.NEUTRAL_HOVER)
+            theme.set_enabled(self.backup_button, True)
+            theme.set_enabled(self.scan_button, True)
+            theme.set_enabled(self.cancel_button, False)
 
     def backup_completed_callback(self, success, message):
         """Callback for when backup completes"""
@@ -381,13 +398,26 @@ class BackupTab:
         def update_ui():
             # Update UI controls
             self._backup_active = False
-            self.backup_button.configure(state="normal")
-            self.scan_button.configure(state="normal")
-            self.cancel_button.configure(state="disabled", fg_color=theme.NEUTRAL, hover_color=theme.NEUTRAL_HOVER)
+            theme.set_enabled(self.backup_button, True)
+            theme.set_enabled(self.scan_button, True)
+            theme.set_enabled(self.cancel_button, False)
+            self.parent.toast(message, kind="success" if success else "error")
+
+            # The 1 s poll stops once the engine does, so write the final
+            # numbers here rather than leaving the last sampled percentage.
+            done, total = self.backup_engine.processed_files, self.backup_engine.total_files
+            if total:
+                self.progress_bar.set(done / total)
+                verb = "Finished" if success else "Stopped"
+                self.progress_label.configure(text=f"{verb}  —  {done:,} of {total:,} files copied")
+            else:
+                self.progress_bar.set(1.0 if success else 0)
+                self.progress_label.configure(text="Finished  —  nothing needed copying"
+                                              if success else "Stopped")
 
             # Reload job details
             job_name = self.job_selection_var.get()
-            if job_name != "No jobs available":
+            if job_name != NO_JOBS:
                 self.on_job_selected(job_name)
 
             # Refresh jobs list
@@ -411,8 +441,8 @@ class BackupTab:
 
                 percent = int(progress * 100)
                 self.progress_label.configure(
-                    text=f"{self.backup_engine.processed_files} / {self.backup_engine.total_files} "
-                         f"files copied ({percent}%) — {self.backup_engine.scanned_files_count} scanned"
+                    text=f"{percent}%  —  {self.backup_engine.processed_files:,} of "
+                         f"{self.backup_engine.total_files:,} files copied"
                 )
 
                 # Update time elapsed
@@ -421,22 +451,24 @@ class BackupTab:
                     hours, remainder = divmod(int(elapsed), 3600)
                     minutes, seconds = divmod(remainder, 60)
                     self.time_label.configure(
-                        text=f"Time elapsed: {hours:02d}:{minutes:02d}:{seconds:02d}"
+                        text=f"Elapsed {hours:02d}:{minutes:02d}:{seconds:02d}  "
+                             f"({self.backup_engine.scanned_files_count:,} files checked)"
                     )
 
             # Update job status
             job_name = self.job_selection_var.get()
-            if job_name != "No jobs available":
-                theme.set_badge(self.job_details_labels[4], "Running Backup", kind="info")
+            if job_name != NO_JOBS:
+                theme.set_badge(self.job_details["status"], "Running", kind="info")
 
         # Button state is owned explicitly by _backup_active, not inferred from
         # widget state or engine.running (which toggles between jobs in a batch
         # — see BatchJobsTab, which holds this flag for the whole batch).
         if self._backup_active:
-            self.backup_button.configure(state="disabled")
-            self.scan_button.configure(state="disabled")
-            self.cancel_button.configure(state="normal", fg_color=theme.DANGER, hover_color=theme.DANGER_HOVER)
+            theme.set_enabled(self.backup_button, False)
+            theme.set_enabled(self.scan_button, False)
+            theme.set_enabled(self.cancel_button, True)
         else:
-            self.backup_button.configure(state="normal")
-            self.scan_button.configure(state="normal")
-            self.cancel_button.configure(state="disabled", fg_color=theme.NEUTRAL, hover_color=theme.NEUTRAL_HOVER)
+            has_jobs = bool(self.job_ids_by_name)
+            theme.set_enabled(self.backup_button, has_jobs)
+            theme.set_enabled(self.scan_button, has_jobs)
+            theme.set_enabled(self.cancel_button, False)

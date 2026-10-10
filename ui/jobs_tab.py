@@ -28,234 +28,150 @@ class JobsTab:
 
     def setup_jobs_tab(self, tab_view):
         jobs_tab = tab_view.tab("Jobs")
-
-        # Create frames
-        jobs_tab.grid_columnconfigure(0, weight=1)
+        jobs_tab.grid_columnconfigure(0, weight=5, uniform="jobs")
+        jobs_tab.grid_columnconfigure(1, weight=6, uniform="jobs")
         jobs_tab.grid_rowconfigure(0, weight=1)
 
-        # Main frame
-        main_frame = ctk.CTkFrame(jobs_tab, fg_color="transparent")
-        main_frame.grid(row=0, column=0, padx=6, pady=6, sticky="nsew")
+        # ------------------------------------------------------ left: list
+        list_card = theme.card(jobs_tab)
+        list_card.grid(row=0, column=0, padx=(12, theme.GAP // 2), pady=12, sticky="nsew")
+        list_card.grid_columnconfigure(0, weight=1)
+        list_card.grid_rowconfigure(2, weight=1)
 
-        main_frame.grid_columnconfigure(0, weight=3)
-        main_frame.grid_columnconfigure(1, weight=2)
-        main_frame.grid_rowconfigure(1, weight=1)
+        list_header = ctk.CTkFrame(list_card, fg_color="transparent")
+        list_header.grid(row=0, column=0, padx=theme.PAD, pady=(theme.PAD, 2), sticky="ew")
+        list_header.grid_columnconfigure(0, weight=1)
+        self.list_title = theme.section_label(list_header, "Your jobs")
+        self.list_title.grid(row=0, column=0, sticky="w")
 
-        # Run All button, above the jobs list
-        jobs_controls_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        jobs_controls_frame.grid(row=0, column=0, padx=(0, 8), pady=(0, 6), sticky="ew")
-        jobs_controls_frame.grid_columnconfigure(0, weight=1)
-
-        self.run_all_button = theme.primary_button(
-            jobs_controls_frame,
-            text="Run All Jobs",
+        self.run_all_button = theme.secondary_button(
+            list_header, text="Run all jobs",
             command=lambda: self.parent.batch_jobs_tab.run_all_jobs()
         )
-        self.run_all_button.grid(row=0, column=0, padx=0, pady=0, sticky="e")
+        self.run_all_button.grid(row=0, column=1, sticky="e")
 
-        # Jobs list frame
-        jobs_list_frame = ctk.CTkScrollableFrame(
-            main_frame, label_text="Backup Jobs", label_font=theme.FONT_H1,
-            fg_color=theme.SURFACE, corner_radius=theme.RADIUS,
-        )
-        jobs_list_frame.grid(row=1, column=0, padx=(0, 8), pady=(0, 8), sticky="nsew")
+        theme.hint_label(list_card, "Select a job to edit it.").grid(
+            row=1, column=0, padx=theme.PAD, pady=(0, 8), sticky="w")
+
+        jobs_list_frame = ctk.CTkScrollableFrame(list_card, fg_color="transparent")
+        jobs_list_frame.grid(row=2, column=0, padx=(theme.PAD - 8, 8), pady=(0, 12), sticky="nsew")
         jobs_list_frame.grid_columnconfigure(0, weight=1)
-
         self.jobs_list_frame = jobs_list_frame
+        self.job_rows = {}
 
-        # Job detail/edit frame
-        job_edit_frame = theme.card(main_frame)
-        job_edit_frame.grid(row=0, column=1, rowspan=2, padx=(8, 0), pady=8, sticky="nsew")
-
+        # ------------------------------------------------------ right: form
+        job_edit_frame = theme.card(jobs_tab)
+        job_edit_frame.grid(row=0, column=1, padx=(theme.GAP // 2, 12), pady=12, sticky="nsew")
         job_edit_frame.grid_columnconfigure(0, weight=1)
-        job_edit_frame.grid_rowconfigure(7, weight=1)
+        job_edit_frame.grid_rowconfigure(10, weight=1)
 
-        # Job edit controls
-        theme.section_label(job_edit_frame, "Add / Edit Backup Job").grid(
-            row=0, column=0, padx=16, pady=(16, 18), sticky="w"
-        )
+        self.form_title = theme.section_label(job_edit_frame, "New job")
+        self.form_title.grid(row=0, column=0, padx=theme.PAD, pady=(theme.PAD, 2), sticky="w")
+        self.form_hint = theme.hint_label(
+            job_edit_frame, "Pick a folder to protect and a folder to copy it into.")
+        self.form_hint.grid(row=1, column=0, padx=theme.PAD, pady=(0, 18), sticky="w")
 
         # Job name
-        ctk.CTkLabel(job_edit_frame, text="Job Name", font=theme.FONT_BODY_BOLD,
-                     text_color=theme.TEXT_MUTED).grid(
-            row=1, column=0, padx=16, pady=(0, 5), sticky="w"
-        )
-
+        theme.field_label(job_edit_frame, "Name").grid(
+            row=2, column=0, padx=theme.PAD, pady=(0, 4), sticky="w")
         self.job_name_var = ctk.StringVar()
-        job_name_entry = ctk.CTkEntry(
-            job_edit_frame,
-            textvariable=self.job_name_var,
-            width=280,
-            font=theme.FONT_BODY,
-            corner_radius=theme.RADIUS_SM,
-            fg_color=theme.SURFACE_ALT,
-            border_color=theme.BORDER,
-        )
-        job_name_entry.grid(row=2, column=0, padx=16, pady=(0, 12), sticky="w")
+        self.job_name_entry = theme.entry(
+            job_edit_frame, textvariable=self.job_name_var,
+            placeholder_text="e.g. Photos to external drive")
+        self.job_name_entry.grid(row=3, column=0, padx=theme.PAD, pady=(0, 14), sticky="ew")
 
         # Source path
-        ctk.CTkLabel(job_edit_frame, text="Source Path", font=theme.FONT_BODY_BOLD,
-                     text_color=theme.TEXT_MUTED).grid(
-            row=3, column=0, padx=16, pady=(0, 5), sticky="w"
-        )
-
+        theme.field_label(job_edit_frame, "Folder to back up").grid(
+            row=4, column=0, padx=theme.PAD, pady=(0, 4), sticky="w")
         source_path_frame = ctk.CTkFrame(job_edit_frame, fg_color="transparent")
-        source_path_frame.grid(row=4, column=0, padx=16, pady=(0, 12), sticky="ew")
-
+        source_path_frame.grid(row=5, column=0, padx=theme.PAD, pady=(0, 14), sticky="ew")
         source_path_frame.grid_columnconfigure(0, weight=1)
 
         self.source_path_var = ctk.StringVar()
-        source_path_entry = ctk.CTkEntry(
-            source_path_frame,
-            textvariable=self.source_path_var,
-            font=theme.FONT_BODY,
-            corner_radius=theme.RADIUS_SM,
-            fg_color=theme.SURFACE_ALT,
-            border_color=theme.BORDER,
-        )
-        source_path_entry.grid(row=0, column=0, padx=(0, 6), pady=0, sticky="ew")
-
-        source_browse_button = theme.secondary_button(
-            source_path_frame,
-            text="Browse",
-            width=80,
+        theme.entry(source_path_frame, textvariable=self.source_path_var,
+                    font=theme.FONT_MONO).grid(row=0, column=0, padx=(0, 8), sticky="ew")
+        theme.secondary_button(
+            source_path_frame, text="Browse", width=88,
             command=lambda: self.browse_directory(self.source_path_var)
-        )
-        source_browse_button.grid(row=0, column=1, padx=0, pady=0)
+        ).grid(row=0, column=1)
 
         # Destination type
-        ctk.CTkLabel(job_edit_frame, text="Destination Type", font=theme.FONT_BODY_BOLD,
-                     text_color=theme.TEXT_MUTED).grid(
-            row=5, column=0, padx=16, pady=(0, 5), sticky="w"
-        )
+        theme.field_label(job_edit_frame, "Copy to").grid(
+            row=6, column=0, padx=theme.PAD, pady=(0, 4), sticky="w")
 
-        # Destination type selection
         self.dest_type_var = ctk.StringVar(value="Local Directory")
         dest_type_frame = ctk.CTkFrame(job_edit_frame, fg_color="transparent")
-        dest_type_frame.grid(row=6, column=0, padx=16, pady=(0, 12), sticky="ew")
+        dest_type_frame.grid(row=7, column=0, padx=theme.PAD, pady=(0, 8), sticky="ew")
 
-        dest_type_local = ctk.CTkRadioButton(
-            dest_type_frame,
-            text="Local Directory",
-            font=theme.FONT_BODY,
-            fg_color=theme.ACCENT,
-            hover_color=theme.ACCENT_HOVER,
-            variable=self.dest_type_var,
-            value="Local Directory",
-            command=self.toggle_destination_type
-        )
-        dest_type_local.grid(row=0, column=0, padx=(0, 10), pady=5, sticky="w")
+        ctk.CTkRadioButton(
+            dest_type_frame, text="A folder on this computer or a drive",
+            font=theme.FONT_BODY, variable=self.dest_type_var, value="Local Directory",
+            command=self.toggle_destination_type, radiobutton_width=18, radiobutton_height=18,
+        ).grid(row=0, column=0, padx=(0, 18), pady=4, sticky="w")
 
         # Google Drive support is not wired up in this build (see
         # REMEDIATION_PLAN.md Phase 6) — disable rather than leave it broken.
-        dest_type_gdrive = ctk.CTkRadioButton(
-            dest_type_frame,
-            text="Google Drive",
-            font=theme.FONT_BODY,
-            variable=self.dest_type_var,
-            value="Google Drive",
-            command=self.toggle_destination_type,
-            state="disabled"
-        )
-        dest_type_gdrive.grid(row=0, column=1, padx=10, pady=5, sticky="w")
-
-        ctk.CTkLabel(
-            dest_type_frame,
-            text="(not available in this build)",
-            font=theme.FONT_SMALL,
-            text_color=theme.TEXT_MUTED
-        ).grid(row=0, column=2, padx=(0, 10), pady=5, sticky="w")
-
-        # Destination path
-        ctk.CTkLabel(job_edit_frame, text="Destination Path", font=theme.FONT_BODY_BOLD,
-                     text_color=theme.TEXT_MUTED).grid(
-            row=7, column=0, padx=16, pady=(0, 5), sticky="w"
-        )
+        ctk.CTkRadioButton(
+            dest_type_frame, text="Google Drive (coming soon)", font=theme.FONT_BODY,
+            variable=self.dest_type_var, value="Google Drive",
+            command=self.toggle_destination_type, state="disabled",
+            radiobutton_width=18, radiobutton_height=18,
+        ).grid(row=0, column=1, pady=4, sticky="w")
 
         # Local destination frame
         self.local_dest_frame = ctk.CTkFrame(job_edit_frame, fg_color="transparent")
-        self.local_dest_frame.grid(row=8, column=0, padx=16, pady=(0, 12), sticky="ew")
+        self.local_dest_frame.grid(row=8, column=0, padx=theme.PAD, pady=(0, 14), sticky="ew")
         self.local_dest_frame.grid_columnconfigure(0, weight=1)
 
         self.dest_path_var = ctk.StringVar()
-        dest_path_entry = ctk.CTkEntry(
-            self.local_dest_frame,
-            textvariable=self.dest_path_var,
-            font=theme.FONT_BODY,
-            corner_radius=theme.RADIUS_SM,
-            fg_color=theme.SURFACE_ALT,
-            border_color=theme.BORDER,
-        )
-        dest_path_entry.grid(row=0, column=0, padx=(0, 6), pady=0, sticky="ew")
-
-        dest_browse_button = theme.secondary_button(
-            self.local_dest_frame,
-            text="Browse",
-            width=80,
+        theme.entry(self.local_dest_frame, textvariable=self.dest_path_var,
+                    font=theme.FONT_MONO).grid(row=0, column=0, padx=(0, 8), sticky="ew")
+        theme.secondary_button(
+            self.local_dest_frame, text="Browse", width=88,
             command=lambda: self.browse_directory(self.dest_path_var)
-        )
-        dest_browse_button.grid(row=0, column=1, padx=0, pady=0)
+        ).grid(row=0, column=1)
 
         # Google Drive destination frame
         self.gdrive_dest_frame = ctk.CTkFrame(job_edit_frame, fg_color="transparent")
-        self.gdrive_dest_frame.grid(row=8, column=0, padx=16, pady=(0, 12), sticky="ew")
-        self.gdrive_dest_frame.grid_columnconfigure(0, weight=1)
+        self.gdrive_dest_frame.grid(row=8, column=0, padx=theme.PAD, pady=(0, 14), sticky="ew")
+        self.gdrive_dest_frame.grid_columnconfigure(1, weight=1)
 
-        # Google Drive folder selection
         self.gdrive_folder_var = ctk.StringVar(value="root")
         self.gdrive_folder_id_var = ctk.StringVar(value="root")
 
-        gdrive_folder_label = ctk.CTkLabel(
-            self.gdrive_dest_frame,
-            text="Selected Folder:",
-            font=theme.FONT_BODY,
-        )
-        gdrive_folder_label.grid(row=0, column=0, padx=5, pady=5, sticky="w")
-
+        theme.field_label(self.gdrive_dest_frame, "Folder").grid(
+            row=0, column=0, padx=(0, 8), pady=5, sticky="w")
         self.gdrive_folder_display = ctk.CTkLabel(
-            self.gdrive_dest_frame,
-            textvariable=self.gdrive_folder_var,
-            font=theme.FONT_BODY_BOLD
-        )
-        self.gdrive_folder_display.grid(row=0, column=1, padx=5, pady=5, sticky="w")
-
-        gdrive_select_button = theme.secondary_button(
-            self.gdrive_dest_frame,
-            text="Select Folder",
-            width=100,
+            self.gdrive_dest_frame, textvariable=self.gdrive_folder_var, font=theme.FONT_BODY_BOLD)
+        self.gdrive_folder_display.grid(row=0, column=1, pady=5, sticky="w")
+        theme.secondary_button(
+            self.gdrive_dest_frame, text="Choose folder", width=120,
             command=self.select_google_drive_folder
-        )
-        gdrive_select_button.grid(row=1, column=0, columnspan=2, padx=5, pady=5)
+        ).grid(row=0, column=2, pady=5)
 
         # Hide Google Drive frame by default
         self.gdrive_dest_frame.grid_remove()
 
-        # Buttons
+        # Buttons: primary action first, destructive action last and apart
         buttons_frame = ctk.CTkFrame(job_edit_frame, fg_color="transparent")
-        buttons_frame.grid(row=9, column=0, padx=12, pady=(16, 16), sticky="ew")
-
-        buttons_frame.grid_columnconfigure((0, 1, 2), weight=1)
+        buttons_frame.grid(row=9, column=0, padx=theme.PAD, pady=(8, theme.PAD), sticky="ew")
+        buttons_frame.grid_columnconfigure(2, weight=1)
 
         self.save_job_button = theme.primary_button(
-            buttons_frame,
-            text="Save",
-            command=self.save_job
-        )
-        self.save_job_button.grid(row=0, column=0, padx=4, pady=4, sticky="ew")
+            buttons_frame, text="Create job", width=130, command=self.save_job)
+        self.save_job_button.grid(row=0, column=0, padx=(0, 8))
 
         self.new_job_button = theme.secondary_button(
-            buttons_frame,
-            text="New",
-            command=self.new_job
-        )
-        self.new_job_button.grid(row=0, column=1, padx=4, pady=4, sticky="ew")
+            buttons_frame, text="Clear form", width=110, command=self.new_job)
+        self.new_job_button.grid(row=0, column=1)
 
         self.delete_job_button = theme.danger_button(
-            buttons_frame,
-            text="Delete",
-            command=self.delete_job
-        )
-        self.delete_job_button.grid(row=0, column=2, padx=4, pady=4, sticky="ew")
+            buttons_frame, text="Delete job", width=110, command=self.delete_job)
+        self.delete_job_button.grid(row=0, column=3, sticky="e")
+
+        # Enter saves from anywhere in the form
+        for widget in (self.job_name_entry,):
+            widget.bind("<Return>", lambda _e: self.save_job())
 
         # Initialize editing state
         self.new_job()
@@ -266,70 +182,55 @@ class JobsTab:
             # Clear existing jobs list
             for widget in self.jobs_list_frame.winfo_children():
                 widget.destroy()
+            self.job_rows = {}
 
             # Get all active jobs
             BackupJob = self.parent.BackupJob
-            jobs = self.db_session.query(BackupJob).filter_by(is_active=True).all()
+            jobs = self.db_session.query(BackupJob).filter_by(is_active=True).order_by(BackupJob.name).all()
 
-            # Update parent's job selection dropdown
-            backup_tab = self.parent.backup_tab
-            backup_tab.job_ids_by_name = {job.name: job.id for job in jobs}
-            if jobs:
-                job_names = [job.name for job in jobs]
-                backup_tab.job_selection.configure(values=job_names)
-                backup_tab.job_selection_var.set(jobs[0].name)
-                backup_tab.on_job_selected(jobs[0].name)
-            else:
-                backup_tab.job_selection.configure(values=["No jobs available"])
-                backup_tab.job_selection_var.set("No jobs available")
-                backup_tab.update_job_details(None)
+            # Keep the Backup page's selector in sync
+            self.parent.backup_tab.set_jobs(jobs)
+            self.list_title.configure(text=f"Your jobs ({len(jobs)})" if jobs else "Your jobs")
+            theme.set_enabled(self.run_all_button, bool(jobs))
 
-            # Add jobs to the jobs list
             if not jobs:
-                ctk.CTkLabel(
-                    self.jobs_list_frame, text="No backup jobs yet — create one on the right.",
-                    font=theme.FONT_BODY, text_color=theme.TEXT_MUTED,
-                ).grid(row=0, column=0, padx=10, pady=20, sticky="w")
+                theme.hint_label(
+                    self.jobs_list_frame,
+                    "No jobs yet. Fill in the form on the right to create your first one.",
+                    wraplength=300,
+                ).grid(row=0, column=0, padx=8, pady=20, sticky="w")
 
             for i, job in enumerate(jobs):
-                job_frame = ctk.CTkFrame(self.jobs_list_frame, fg_color=theme.SURFACE_ALT,
-                                          corner_radius=theme.RADIUS_SM)
-                job_frame.grid(row=i, column=0, padx=6, pady=6, sticky="ew")
-                job_frame.grid_columnconfigure(0, weight=1)
+                row = ctk.CTkFrame(self.jobs_list_frame, fg_color=theme.RAISED,
+                                   corner_radius=theme.RADIUS_SM)
+                row.grid(row=i, column=0, padx=0, pady=4, sticky="ew")
+                row.grid_columnconfigure(0, weight=1)
 
-                # Job Name
-                ctk.CTkLabel(job_frame, text=job.name, font=theme.FONT_H2).grid(
-                    row=0, column=0, padx=12, pady=(10, 4), sticky="w"
-                )
+                ctk.CTkLabel(row, text=job.name, font=theme.FONT_H2, anchor="w").grid(
+                    row=0, column=0, padx=14, pady=(12, 0), sticky="w")
+                ctk.CTkLabel(row, text=theme.shorten_path(job.source_path, 44),
+                             font=theme.FONT_MONO, text_color=theme.TEXT_MUTED, anchor="w").grid(
+                    row=1, column=0, padx=14, pady=0, sticky="w")
 
-                # Source Path
-                source_text = f"Source: {job.source_path}"
-                if len(source_text) > 40:
-                    source_text = source_text[:37] + "..."
-                ctk.CTkLabel(job_frame, text=source_text, font=theme.FONT_SMALL,
-                             text_color=theme.TEXT_MUTED).grid(
-                    row=1, column=0, padx=12, pady=0, sticky="w"
-                )
+                last_backup = ("Never backed up" if not job.last_backup
+                               else f"Last backup {job.last_backup:%d %b %Y, %H:%M}")
+                theme.hint_label(row, last_backup, text_color=theme.TEXT_FAINT).grid(
+                    row=2, column=0, padx=14, pady=(0, 12), sticky="w")
 
-                # Last Backup
-                last_backup = "Never" if not job.last_backup else job.last_backup.strftime("%Y-%m-%d %H:%M")
-                ctk.CTkLabel(job_frame, text=f"Last Backup: {last_backup}", font=theme.FONT_SMALL,
-                             text_color=theme.TEXT_MUTED).grid(
-                    row=2, column=0, padx=12, pady=(0, 10), sticky="w"
-                )
+                theme.make_clickable(row, lambda j=job: self.edit_job(j))
+                self.job_rows[job.id] = row
 
-                # Edit button
-                edit_button = theme.secondary_button(
-                    job_frame,
-                    text="Edit",
-                    width=60,
-                    command=lambda j=job: self.edit_job(j)
-                )
-                edit_button.grid(row=0, column=1, rowspan=3, padx=12, pady=10)
+            self._highlight_editing_row()
 
         except Exception as e:
             logger.error(f"Error loading backup jobs: {e}")
             self.parent.log_message(f"Error loading backup jobs: {e}")
+
+    def _highlight_editing_row(self):
+        for job_id, row in self.job_rows.items():
+            selected = job_id == self.current_editing_job_id
+            theme.set_row_base(row, theme.RAISED_HOVER if selected else theme.RAISED)
+            row.configure(border_width=1 if selected else 0, border_color=theme.LINE_STRONG)
 
     def browse_directory(self, string_var):
         """Open directory browser and update the StringVar"""
@@ -462,7 +363,8 @@ class JobsTab:
             folder_frame = ctk.CTkFrame(folder_window)
             folder_frame.pack(padx=10, pady=10, fill="both", expand=True)
 
-            folder_listbox = tk.Listbox(folder_frame, bg="#2b2b2b", fg="white", selectbackground="#1f538d")
+            folder_listbox = tk.Listbox(folder_frame, bg="#262626", fg="#F2F2F2", selectbackground="#474747",
+                                        borderwidth=0, highlightthickness=0, font=theme.FONT_BODY)
             folder_listbox.pack(padx=10, pady=10, fill="both", expand=True)
             folder_listbox.bind("<Double-Button-1>", on_folder_select)
 
@@ -515,37 +417,21 @@ class JobsTab:
             destination_type = DestinationType.GOOGLE_DRIVE
 
         if not name or not source_path:
-            CTkMessagebox(
-                title="Error",
-                message="Job name and source path are required",
-                icon="cancel"
-            )
+            self.parent.toast("Add a name and a folder to back up.", kind="error")
             return
 
         if not os.path.isdir(source_path):
-            CTkMessagebox(
-                title="Error",
-                message="Source path is not a valid directory",
-                icon="cancel"
-            )
+            self.parent.toast("The folder to back up doesn't exist. Choose it with Browse.", kind="error")
             return
 
         # Validate destination based on type
         if dest_type == "Local Directory":
             if not dest_path:
-                CTkMessagebox(
-                    title="Error",
-                    message="Destination path is required",
-                    icon="cancel"
-                )
+                self.parent.toast("Choose where to copy the files.", kind="error")
                 return
 
             if not os.path.isdir(dest_path):
-                CTkMessagebox(
-                    title="Error",
-                    message="Destination path is not a valid directory",
-                    icon="cancel"
-                )
+                self.parent.toast("The destination folder doesn't exist. Connect the drive or choose another folder.", kind="error")
                 return
         else:  # Google Drive
             if not google_drive_folder_id:
@@ -578,11 +464,7 @@ class JobsTab:
                 BackupJob.id != (self.current_editing_job_id or -1),
             ).first()
             if clash:
-                CTkMessagebox(
-                    title="Error",
-                    message="An active job with this name already exists",
-                    icon="cancel"
-                )
+                self.parent.toast(f"A job named \"{name}\" already exists. Pick another name.", kind="error")
                 return
 
             if self.current_editing_job_id is not None:
@@ -595,11 +477,7 @@ class JobsTab:
                     job.destination_type = destination_type
                     job.google_drive_folder_id = google_drive_folder_id
                     self.db_session.commit()
-                    CTkMessagebox(
-                        title="Success",
-                        message="Job updated successfully",
-                        icon="check"
-                    )
+                    self.parent.toast("Changes saved")
             else:
                 # Creating new job
                 job = BackupJob(
@@ -612,15 +490,15 @@ class JobsTab:
                 )
                 self.db_session.add(job)
                 self.db_session.commit()
-                CTkMessagebox(
-                    title="Success",
-                    message="Job created successfully",
-                    icon="check"
-                )
+                self.parent.toast(f"Job created: {name}")
 
-            # Refresh the jobs list
+            # Refresh the jobs list, keeping an edited job open in the form
+            editing = self.current_editing_job_id is not None
             self.load_backup_jobs()
-            self.new_job()
+            if editing:
+                self.edit_job(job)
+            else:
+                self.new_job()
 
         except Exception as e:
             logger.error(f"Error saving job: {e}")
@@ -644,8 +522,11 @@ class JobsTab:
         self.local_dest_frame.grid()
         self.gdrive_dest_frame.grid_remove()
 
-        self.save_job_button.configure(text="Create Job")
-        self.delete_job_button.configure(state="disabled", fg_color=theme.NEUTRAL, hover_color=theme.NEUTRAL_HOVER)
+        self.save_job_button.configure(text="Create job")
+        theme.set_enabled(self.delete_job_button, False)
+        self.form_title.configure(text="New job")
+        self.form_hint.configure(text="Pick a folder to protect and a folder to copy it into.")
+        self._highlight_editing_row()
 
     def edit_job(self, job):
         """Load a job into the edit form"""
@@ -669,11 +550,14 @@ class JobsTab:
             self.gdrive_dest_frame.grid_remove()
             self.dest_path_var.set(job.destination_path)
 
-        self.save_job_button.configure(text="Update Job")
-        self.delete_job_button.configure(state="normal", fg_color=theme.DANGER, hover_color=theme.DANGER_HOVER)
+        self.save_job_button.configure(text="Save changes")
+        theme.set_enabled(self.delete_job_button, True)
+        self.form_title.configure(text=f"Edit {job.name}")
+        self.form_hint.configure(text="Changes apply the next time this job runs.")
+        self._highlight_editing_row()
 
         # Switch to Jobs tab
-        self.parent.tab_view.set("Jobs")
+        self.parent.show_page("Jobs")
 
     def delete_job(self):
         """Delete the current job"""
@@ -683,14 +567,14 @@ class JobsTab:
         # Show confirmation dialog
         messagebox = CTkMessagebox(
             title="Confirm Deletion",
-            message="Are you sure you want to delete this job?",
+            message=f"Delete \"{self.job_name_var.get()}\"? Files already backed up stay where they are.",
             icon="question",
             option_1="Cancel",
-            option_2="Delete"
+            option_2="Delete job"
         )
         response = messagebox.get()
 
-        if response == "Delete":
+        if response == "Delete job":
             try:
                 BackupJob = self.parent.BackupJob
                 job = self.db_session.get(BackupJob, self.current_editing_job_id)
@@ -699,11 +583,7 @@ class JobsTab:
                     job.is_active = False
                     self.db_session.commit()
 
-                    CTkMessagebox(
-                        title="Success",
-                        message="Job deleted successfully",
-                        icon="check"
-                    )
+                    self.parent.toast(f"Job deleted: {job.name}")
 
                     # Refresh jobs list and clear form
                     self.load_backup_jobs()

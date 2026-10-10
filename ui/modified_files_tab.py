@@ -28,58 +28,56 @@ class ModifiedFilesTab:
         tab.grid_columnconfigure(0, weight=1)
         tab.grid_rowconfigure(0, weight=1)
 
-        main_frame = ctk.CTkFrame(tab, fg_color="transparent")
-        main_frame.grid(row=0, column=0, padx=6, pady=6, sticky="nsew")
-        main_frame.grid_columnconfigure(0, weight=1)
-        main_frame.grid_rowconfigure(2, weight=1)
+        table_card = theme.card(tab)
+        table_card.grid(row=0, column=0, padx=12, pady=12, sticky="nsew")
+        table_card.grid_columnconfigure(0, weight=1)
+        table_card.grid_rowconfigure(2, weight=1)
 
         # Controls
-        controls_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        controls_frame.grid(row=0, column=0, padx=0, pady=(0, 6), sticky="ew")
+        controls_frame = ctk.CTkFrame(table_card, fg_color="transparent")
+        controls_frame.grid(row=0, column=0, padx=theme.PAD, pady=(theme.PAD, 14), sticky="ew")
         controls_frame.grid_columnconfigure(0, weight=1)
 
-        theme.section_label(controls_frame, "Jobs With Modified Files").grid(
-            row=0, column=0, sticky="w"
-        )
+        self.status_label = theme.hint_label(
+            controls_frame, "Check your jobs to see which files changed since their last backup.",
+            font=theme.FONT_BODY)
+        self.status_label.grid(row=0, column=0, sticky="w")
 
         self.refresh_button = theme.primary_button(
-            controls_frame, text="Refresh", command=self.refresh
-        )
-        self.refresh_button.grid(row=0, column=1, sticky="e", padx=(8, 0))
+            controls_frame, text="Check now", width=120, command=self.refresh)
+        self.refresh_button.grid(row=0, column=1, sticky="e", padx=(12, 0))
+        self.parent.bind_all("<F5>", lambda _e: self.refresh())
 
-        self.status_label = ctk.CTkLabel(
-            main_frame, text="Click Refresh to scan backup jobs for changes.",
-            font=theme.FONT_SMALL, text_color=theme.TEXT_MUTED,
-        )
-        self.status_label.grid(row=1, column=0, padx=2, pady=(0, 8), sticky="w")
-
-        # Table
-        table_card = theme.card(main_frame)
-        table_card.grid(row=2, column=0, sticky="nsew")
-        table_card.grid_columnconfigure(0, weight=1)
-        table_card.grid_rowconfigure(1, weight=1)
-
-        self._column_weights = [3, 4, 2, 2, 2]
-        header = ctk.CTkFrame(table_card, fg_color=theme.SURFACE_ALT, corner_radius=0)
-        header.grid(row=0, column=0, sticky="ew", padx=1, pady=(1, 0))
-        for col, text in enumerate(["Job", "Source Path", "Modified Files", "Last Backup", ""]):
-            header.grid_columnconfigure(col, weight=self._column_weights[col])
-            ctk.CTkLabel(header, text=text, font=theme.FONT_BODY_BOLD).grid(
-                row=0, column=col, padx=12, pady=8, sticky="w"
-            )
+        # Table header. Header and body share column sizing so they line up.
+        self._column_weights = [3, 5, 2, 3, 3]
+        header = ctk.CTkFrame(table_card, fg_color="transparent", corner_radius=0)
+        # Offsets match the scrollable body (its inner inset + scrollbar)
+        header.grid(row=1, column=0, sticky="ew", padx=(theme.PAD + 14, theme.PAD + 22))
+        for col, text in enumerate(["Job", "Folder", "Changed", "Last backup", ""]):
+            header.grid_columnconfigure(col, weight=self._column_weights[col], uniform="cols")
+            theme.field_label(header, text).grid(row=0, column=col, padx=8, pady=(0, 8), sticky="w")
+        ctk.CTkFrame(header, fg_color=theme.LINE, height=1, corner_radius=0).grid(
+            row=1, column=0, columnspan=5, sticky="ew")
 
         self.table_body = ctk.CTkScrollableFrame(table_card, fg_color="transparent")
-        self.table_body.grid(row=1, column=0, sticky="nsew", padx=1, pady=(0, 1))
+        self.table_body.grid(row=2, column=0, sticky="nsew", padx=(theme.PAD, 8), pady=(0, 12))
         for col, weight in enumerate(self._column_weights):
-            self.table_body.grid_columnconfigure(col, weight=weight)
+            self.table_body.grid_columnconfigure(col, weight=weight, uniform="cols")
+
+        self._show_placeholder("Nothing checked yet. Press Check now, or F5.")
+
+    def _show_placeholder(self, text):
+        theme.hint_label(self.table_body, text, font=theme.FONT_BODY).grid(
+            row=0, column=0, columnspan=5, padx=8, pady=24, sticky="w")
 
     def refresh(self):
         """Rescan every active job's source directory for pending changes."""
         if self._scanning:
             return
         self._scanning = True
-        self.refresh_button.configure(state="disabled", text="Scanning...")
-        self.status_label.configure(text="Scanning backup jobs...")
+        theme.set_enabled(self.refresh_button, False)
+        self.refresh_button.configure(text="Checking…")
+        self.status_label.configure(text="Checking each job’s folder for changes…")
         self._clear_rows()
 
         threading.Thread(target=self._scan_thread, daemon=True).start()
@@ -101,7 +99,7 @@ class ModifiedFilesTab:
                     results.append({
                         "name": job.name, "source_path": job.source_path,
                         "last_backup": job.last_backup, "modified_files": None,
-                        "error": "Source not found",
+                        "error": "Folder missing",
                     })
                     continue
 
@@ -134,82 +132,108 @@ class ModifiedFilesTab:
 
     def _show_error(self, message):
         self._scanning = False
-        self.refresh_button.configure(state="normal", text="Refresh")
-        self.status_label.configure(text=f"Error: {message}")
+        theme.set_enabled(self.refresh_button, True)
+        self.refresh_button.configure(text="Check now")
+        self.status_label.configure(text=f"The check stopped: {message}")
 
     def _show_results(self, results):
         self._scanning = False
-        self.refresh_button.configure(state="normal", text="Refresh")
+        theme.set_enabled(self.refresh_button, True)
+        self.refresh_button.configure(text="Check now")
         self._clear_rows()
 
         rows = [r for r in results if r["error"] or r["modified_files"]]
-        now = datetime.datetime.now().strftime("%H:%M:%S")
+        now = datetime.datetime.now().strftime("%H:%M")
+
+        if not results:
+            self.status_label.configure(text="You don't have any jobs yet.")
+            self._show_placeholder("Create a job on the Jobs page, then check it here.")
+            return
 
         if not rows:
-            self.status_label.configure(text=f"All jobs are up to date. Last checked {now}.")
-            ctk.CTkLabel(
-                self.table_body, text="No jobs currently have modified files.",
-                font=theme.FONT_BODY, text_color=theme.TEXT_MUTED,
-            ).grid(row=0, column=0, columnspan=5, padx=10, pady=20, sticky="w")
+            self.status_label.configure(text=f"Everything is backed up. Checked at {now}.")
+            self._show_placeholder("No job has changed files right now.")
             return
 
         self.status_label.configure(
-            text=f"{len(rows)} of {len(results)} job(s) have modified files. Last checked {now}."
+            text=f"{len(rows)} of {len(results)} jobs need a backup. Checked at {now}."
         )
 
         for i, r in enumerate(rows):
-            ctk.CTkLabel(self.table_body, text=r["name"], font=theme.FONT_BODY, anchor="w").grid(
-                row=i, column=0, padx=12, pady=6, sticky="w"
+            row = i * 2   # odd rows hold the divider lines
+            pad_y = 10
+            ctk.CTkLabel(self.table_body, text=r["name"], font=theme.FONT_BODY_BOLD, anchor="w").grid(
+                row=row, column=0, padx=8, pady=pad_y, sticky="w"
             )
-
-            source_text = r["source_path"]
-            if len(source_text) > 50:
-                source_text = "..." + source_text[-47:]
-            ctk.CTkLabel(self.table_body, text=source_text, font=theme.FONT_SMALL,
-                         text_color=theme.TEXT_MUTED, anchor="w").grid(
-                row=i, column=1, padx=12, pady=6, sticky="w"
+            ctk.CTkLabel(self.table_body, text=theme.shorten_path(r["source_path"], 32),
+                         font=theme.FONT_MONO, text_color=theme.TEXT_MUTED, anchor="w").grid(
+                row=row, column=1, padx=8, pady=pad_y, sticky="w"
             )
 
             if r["error"]:
                 theme.badge(self.table_body, r["error"], kind="danger").grid(
-                    row=i, column=2, padx=12, pady=6, sticky="w"
+                    row=row, column=2, padx=8, pady=pad_y, sticky="w"
                 )
             else:
                 count = len(r["modified_files"])
                 theme.badge(
-                    self.table_body, f"{count} file{'s' if count != 1 else ''}", kind="warning"
-                ).grid(row=i, column=2, padx=12, pady=6, sticky="w")
+                    self.table_body, f"{count:,} file{'s' if count != 1 else ''}", kind="warning"
+                ).grid(row=row, column=2, padx=8, pady=pad_y, sticky="w")
 
-            last_backup = "Never" if not r["last_backup"] else r["last_backup"].strftime("%Y-%m-%d %H:%M")
+            last_backup = "Never" if not r["last_backup"] else r["last_backup"].strftime("%d %b %Y, %H:%M")
             ctk.CTkLabel(self.table_body, text=last_backup, font=theme.FONT_SMALL,
                          text_color=theme.TEXT_MUTED, anchor="w").grid(
-                row=i, column=3, padx=12, pady=6, sticky="w"
+                row=row, column=3, padx=8, pady=pad_y, sticky="w"
             )
 
             if r["modified_files"]:
-                view_button = theme.secondary_button(
-                    self.table_body, text="View", width=64,
+                actions = ctk.CTkFrame(self.table_body, fg_color="transparent")
+                actions.grid(row=row, column=4, padx=8, pady=pad_y, sticky="e")
+                theme.secondary_button(
+                    actions, text="View", width=60, height=30,
                     command=lambda name=r["name"], src=r["source_path"], files=r["modified_files"]:
                         self._view_files(name, src, files)
-                )
-                view_button.grid(row=i, column=4, padx=12, pady=6, sticky="w")
+                ).grid(row=0, column=0, padx=(0, 6))
+                theme.secondary_button(
+                    actions, text="Back up", width=80, height=30,
+                    command=lambda name=r["name"]: self.parent.backup_tab.select_job(name)
+                ).grid(row=0, column=1)
+
+            if i < len(rows) - 1:
+                ctk.CTkFrame(self.table_body, fg_color=theme.LINE, height=1, corner_radius=0).grid(
+                    row=row + 1, column=0, columnspan=5, sticky="ew", padx=8)
 
     def _view_files(self, job_name, source_path, modified_files):
         """Popup listing the specific files pending backup for one job."""
         win = ctk.CTkToplevel(self.parent)
-        win.title(f"Modified Files - {job_name}")
-        win.geometry("520x420")
+        win.title(f"Changed files in {job_name}")
+        win.geometry("620x480")
         win.transient(self.parent)
         win.grab_set()
+        win.grid_columnconfigure(0, weight=1)
+        win.grid_rowconfigure(2, weight=1)
 
-        ctk.CTkLabel(
-            win, text=f"{len(modified_files)} file(s) pending backup in {source_path}",
-            font=theme.FONT_BODY_BOLD, wraplength=480, justify="left",
-        ).pack(padx=12, pady=(12, 6), anchor="w")
+        count = len(modified_files)
+        theme.section_label(win, f"{count:,} changed file{'s' if count != 1 else ''}").grid(
+            row=0, column=0, padx=theme.PAD, pady=(theme.PAD, 0), sticky="w")
+        theme.hint_label(win, f"Paths are relative to {source_path}", wraplength=560).grid(
+            row=1, column=0, padx=theme.PAD, pady=(0, 10), sticky="w")
 
-        box = ctk.CTkTextbox(win, font=theme.FONT_MONO)
-        box.pack(padx=12, pady=(0, 12), fill="both", expand=True)
+        box = ctk.CTkTextbox(win, font=theme.FONT_MONO, border_width=1,
+                             border_color=theme.LINE, corner_radius=theme.RADIUS_SM)
+        box.grid(row=2, column=0, padx=theme.PAD, pady=(0, 14), sticky="nsew")
         box.insert("1.0", "\n".join(modified_files))
         box.configure(state="disabled")
 
-        theme.secondary_button(win, text="Close", command=win.destroy).pack(padx=12, pady=(0, 12))
+        buttons = ctk.CTkFrame(win, fg_color="transparent")
+        buttons.grid(row=3, column=0, padx=theme.PAD, pady=(0, theme.PAD), sticky="e")
+
+        def back_up():
+            win.destroy()
+            self.parent.backup_tab.select_job(job_name)
+
+        theme.secondary_button(buttons, text="Close", width=90, command=win.destroy).grid(
+            row=0, column=0, padx=(0, 8))
+        theme.primary_button(buttons, text="Back up this job", width=140, command=back_up).grid(
+            row=0, column=1)
+        win.bind("<Escape>", lambda _e: win.destroy())
